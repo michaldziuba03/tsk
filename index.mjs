@@ -6,7 +6,7 @@ import { MemoryStorage } from "./memory.mjs";
 
 dotenv.config();
 
-const DOMAIN = "zooart6.yourtechnicaldomain.com";
+const DOMAIN = process.env.DOMAIN || "zooart6.yourtechnicaldomain.com";
 const API_KEY = process.env.API_KEY;
 const BASIC_USERNAME = process.env.BASIC_USERNAME;
 const BASIC_PASSWORD = process.env.BASIC_PASSWORD;
@@ -24,18 +24,22 @@ const ORDERS_SEARCH_URL = `https://${DOMAIN}/api/admin/v5/orders/orders/search`;
 const storage = new MemoryStorage();
 
 async function fetchAllOrders() {
-  const body = {
-    params: {
-      shippmentStatus: "all", // wymagany jest jakiś parametr
-    },
-  };
-
   storage.clear("orders");
 
+  let page = 0;
   let count = 0;
   let allOrders = 1;
 
+  // pobieramy dosłownie wszystkie czyli korzystamy z paginacji
   while (count < allOrders) {
+      const body = {
+        params: {
+          shippmentStatus: "all", // wymagany jest jakiś parametr
+          resultsPage: page,
+          resultsLimit: 100,
+        },
+      };
+
     const response = await fetch(ORDERS_SEARCH_URL, {
       method: "POST",
       body: JSON.stringify(body),
@@ -56,10 +60,14 @@ async function fetchAllOrders() {
     storage.bulkAdd("orders", data);
     count = storage.count("orders");
     allOrders = json.resultsNumberAll;
+    page = json.resultsPage + 1;
     console.log(`Fetched ${count} / ${allOrders}`);
   }
 
-  return storage.get("orders");
+  const result = storage.get("orders");
+  console.log(result.length);
+
+  return result;
 }
 
 function mapOrders(results) {
@@ -106,8 +114,6 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-/* W realu bym pewnie to bym streamował kawałkami zamiast pobierać z 1000 elementów do pamięci i generować z nich CSV */
 app.get("/orders", basicAuth, (req, res) => {
   let orders = storage.get("orders");
   if (!orders.length) {
@@ -115,19 +121,27 @@ app.get("/orders", basicAuth, (req, res) => {
     return;
   }
 
-  const minWorth = intOr(req.query.minWorth, 0);
-  const maxWorth = intOr(req.query.maxWorth, Infinity);
-  orders = orders.filter((order) => order.orderWorth >= minWorth && order.orderWorth <= maxWorth);
+  if (req.query.minWorth) {
+    const minWorth = toNumber(req.query.minWorth, 0);
+     orders = orders.filter((order) => order.orderWorth >= minWorth);
+  }
+  if (req.query.maxWorth) {
+    const maxWorth = toNumber(req.query.maxWorth, 0);
+    orders = orders.filter((order) => order.orderWorth <= maxWorth);
+  }
 
-  csv.stringify(orders, (err, output) => {
-    if (err) {
-      res.status(500).send("Error generating CSV");
-      return;
-    }
-    res.header("Content-Type", "text/csv");
-    res.attachment("orders.csv");
-    res.send(output);
-  });
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", "attachment; filename=orders.csv");
+
+  // strumieniowanie wydaje mi się odrobinę bardziej eleganckim rozwiązaniem
+  // niż generowanie CSV w pamięci i wysyłanie go jako całość
+  const stringifier = csv.stringify();
+  stringifier.pipe(res);
+
+  for (const order of orders) {
+    stringifier.write(order);
+  }
+  stringifier.end();
 });
 
 app.get("/orders/:id", basicAuth, (req, res) => {
@@ -140,11 +154,11 @@ app.get("/orders/:id", basicAuth, (req, res) => {
     return;
   }
 
-  res.json(order);  // nie wiem czy mam to zwrócić jako json czy też jako csv
+  res.json(order);
 });
 
-function intOr(input, fallback) {
-  const parsed = parseInt(input);
+function toNumber(input, fallback) {
+  const parsed = parseFloat(input);
   return isNaN(parsed) ? fallback : parsed;
 }
 

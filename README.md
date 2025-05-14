@@ -1,5 +1,7 @@
 ## readme
 
+2.5h
+
 ```sh
 npm install
 node index.mjs
