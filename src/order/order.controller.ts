@@ -18,6 +18,18 @@ export class OrderController {
   private flattenOrders(orders: IOrder[]): IOrderFlatten[] {
     const result: IOrderFlatten[] = [];
     for (const order of orders) {
+      // edge case: zauważyłem, że niektóre zamówienia mają pustą tablicę produktów
+      // i nie wiem czy mam je w csv uwzględniać czy nie
+      if (!order.products.length) {
+        result.push({
+          orderID: order.orderID,
+          orderWorth: order.orderWorth,
+          productID: '',
+          quantity: 0,
+        });
+        continue;
+      }
+
       for (const product of order.products) {
         result.push({
           orderID: order.orderID,
@@ -27,6 +39,7 @@ export class OrderController {
         });
       }
     }
+
     return result;
   }
 
@@ -53,6 +66,7 @@ export class OrderController {
       for (const order of orders) {
         const overWatermark = stringifier.write(order);
         if (!overWatermark) {
+          this.logger.log("CSV stream is full, waiting for drain");
           await new Promise((resolve) => stringifier.once("drain", resolve));
         }
       }
