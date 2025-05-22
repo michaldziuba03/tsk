@@ -1,19 +1,32 @@
 {
-  "name": "example",
+  "name": "tsk",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start:dev": "tsx watch src/index.ts",
+    "db:init": "node ./scripts/init.mjs",
+    "db:drop": "node ./scripts/drop.mjs",
+    "prebuild": "rimraf dist",
+    "build": "tsc"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Michał Dziuba",
   "dependencies": {
     "cron": "^4.3.0",
     "csv": "^6.3.11",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "node-cron": "^4.0.4"
+    "postgres": "^3.4.6",
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0",
+    "zod": "^3.25.13"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.2",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
   }
 }

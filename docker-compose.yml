@@ -1,0 +1,13 @@
+services:
+  main-db:
+    image: postgres:alpine
+    restart: always
+    volumes:
+       - db_volume:/var/lib/postgresql/data
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+
+volumes:
+  db_volume:
